@@ -1,5 +1,6 @@
 streamlit
-opencv-python
+streamlit-webrtc
+opencv-python-headless
 numpy
-pygame
 tensorflow
+av
