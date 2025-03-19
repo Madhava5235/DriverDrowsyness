@@ -5,6 +5,6 @@ numpy
 tensorflow
 av
 pydub
-ffmpeg
+ffmpeg-python
 imageio[ffmpeg]
 aiortc
