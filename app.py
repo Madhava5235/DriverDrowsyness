@@ -2,7 +2,7 @@ import os
 import av
 import cv2
 import time
-import asyncio  # Fixes the event loop issue
+import asyncio
 import streamlit as st
 import streamlit.components.v1 as components
 from tensorflow.keras.models import load_model
@@ -16,7 +16,7 @@ os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;udp"
 try:
     asyncio.get_running_loop()
 except RuntimeError:
-    asyncio.set_event_loop(asyncio.new_event_loop())  # Create a new event loop if none exists
+    asyncio.set_event_loop(asyncio.new_event_loop())
 
 # Get the absolute path of the working directory
 BASE_DIR = os.getcwd()
@@ -46,12 +46,12 @@ else:
 # Function to play alarm sound using JavaScript
 def play_alarm():
     """Plays alarm sound using JavaScript in Streamlit."""
-    sound_code = f'''
+    sound_code = f"""
     <script>
     var audio = new Audio("{ALARM_PATH}");
     audio.play();
     </script>
-    '''
+    """
     components.html(sound_code)
 
 # Video Processing Class for WebRTC
@@ -99,6 +99,9 @@ webrtc_streamer(
     key="drowsiness",
     video_processor_factory=VideoProcessor,
     media_stream_constraints={"video": True, "audio": False},  # Prevents session conflicts
-    frontend_rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},  # Updated RTC config
-    video_html_attrs={"autoPlay": True, "controls": False, "muted": True}  # Prevents audio issues in browsers
+    frontend_rtc_configuration={
+        "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}],
+        "iceTransportPolicy": "relay"  # Forces TCP transport to avoid `sendto` errors
+    },
+    video_html_attrs={"autoPlay": True, "controls": False, "muted": True}  # Prevents browser autoplay issues
 )
