@@ -104,6 +104,6 @@ webrtc_streamer(
     key="drowsiness",
     video_processor_factory=VideoProcessor,
     media_stream_constraints={"video": True, "audio": False},  # Prevents session conflicts
-    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},  # Google STUN for multi-device support
+    frontend_rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},  # Updated STUN server configuration
     video_html_attrs={"autoPlay": True, "controls": False, "muted": True}  # Mute default to prevent errors
 )
