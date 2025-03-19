@@ -4,12 +4,9 @@ import numpy as np
 import av
 import cv2
 import time
+import streamlit.components.v1 as components
 from tensorflow.keras.models import load_model
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
-
-# Ensure FFmpeg is used for decoding to avoid WebRTC issues
-av.logging.set_level(av.logging.ERROR)
-os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;udp"
 
 # Get the absolute path of the working directory
 BASE_DIR = os.getcwd()
@@ -28,12 +25,16 @@ def load_drowsiness_model():
 
 model = load_drowsiness_model()
 
-# Load alarm sound safely
-if os.path.exists(ALARM_PATH):
-    with open(ALARM_PATH, "rb") as f:
-        alarm_sound = f.read()
-else:
-    st.warning("⚠️ Warning: 'alarm.mp3' not found! Alarm sound will not play.")
+# Function to play alarm sound
+def play_alarm():
+    """Plays alarm sound using JavaScript in Streamlit."""
+    sound_code = f"""
+    <script>
+    var audio = new Audio("{ALARM_PATH}");
+    audio.play();
+    </script>
+    """
+    components.html(sound_code)
 
 # Video Processing Class for WebRTC
 class VideoProcessor(VideoProcessorBase):
@@ -68,8 +69,7 @@ class VideoProcessor(VideoProcessorBase):
         # Play alarm if drowsy (with cooldown)
         if prediction > 0.7 and (time.time() - self.last_alarm_time > 3):  # 3-second cooldown
             self.last_alarm_time = time.time()
-            if os.path.exists(ALARM_PATH):
-                st.audio(alarm_sound, format="audio/mp3", start_time=0)
+            play_alarm()  # Play sound through JavaScript
 
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
@@ -81,4 +81,6 @@ webrtc_streamer(
     key="drowsiness",
     video_processor_factory=VideoProcessor,
     media_stream_constraints={"video": True, "audio": False},  # Prevents session conflicts
+    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},  # Google STUN for multi-device support
+    video_html_attrs={"autoPlay": True, "controls": False, "muted": True}  # Mute default to prevent errors
 )
