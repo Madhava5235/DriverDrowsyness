@@ -28,7 +28,7 @@ model = load_drowsiness_model()
 # Function to play alarm sound with speaker selection
 def play_alarm():
     """Plays alarm sound using JavaScript with speaker selection."""
-    sound_code = f
+    sound_code = f'''
     <script>
     async function playSound() {{
         try {{
@@ -52,7 +52,7 @@ def play_alarm():
         }}
     }}
     playSound();
-    </script>
+    </script>'''
     components.html(sound_code)
 
 # Button to test the buzzer manually
