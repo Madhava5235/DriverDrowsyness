@@ -2,6 +2,7 @@ import os
 import av
 import cv2
 import time
+import asyncio  # Fixes the event loop issue
 import streamlit as st
 import streamlit.components.v1 as components
 from tensorflow.keras.models import load_model
@@ -10,6 +11,12 @@ from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 # Ensure FFmpeg is used for decoding to avoid WebRTC issues
 av.logging.set_level(av.logging.ERROR)
 os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;udp"
+
+# Ensure there is an active event loop
+try:
+    asyncio.get_running_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())  # Create a new event loop if none exists
 
 # Get the absolute path of the working directory
 BASE_DIR = os.getcwd()
@@ -24,7 +31,8 @@ def load_drowsiness_model():
     if not os.path.exists(MODEL_PATH):
         st.error("🔴 Error: Model file not found! Ensure 'drowsiness_cnn_model.h5' exists in your GitHub repo.")
         return None
-    return load_model(MODEL_PATH)
+    model = load_model(MODEL_PATH, compile=False)  # Avoid optimizer warnings
+    return model
 
 model = load_drowsiness_model()
 
