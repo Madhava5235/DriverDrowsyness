@@ -1,45 +1,62 @@
 import streamlit as st
-import numpy as np
-import av
 import cv2
+import numpy as np
+import pygame
 from tensorflow.keras.models import load_model
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
+import time
 
 # Load the trained model
-MODEL_PATH = "drowsiness_cnn_model.h5"
-model = load_model(MODEL_PATH)
+model = load_model("drowsiness_cnn_model.h5")
 
-# Load alarm sound
-with open("alarm.mp3", "rb") as f:
-    alarm_sound = f.read()
+# Initialize pygame for alarm
+pygame.mixer.init()
+pygame.mixer.music.load("alarm.mp3")
 
-# Video Processing Class for WebRTC
-class VideoProcessor(VideoProcessorBase):
-    def recv(self, frame):
-        img = frame.to_ndarray(format="bgr24")
+def detect_drowsiness():
+    cap = cv2.VideoCapture(0)
+    stframe = st.empty()
+    
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            st.error("Error: Could not access the webcam.")
+            break
 
-        # Preprocess image
-        gray_frame = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # Convert to grayscale and preprocess
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         gray_frame = cv2.resize(gray_frame, (64, 64))
-        gray_frame = gray_frame.reshape(1, 64, 64, 1)
-        gray_frame = gray_frame / 255.0  # Normalize
+        gray_frame = gray_frame.reshape(1, 64, 64, 1) / 255.0  # Normalize
 
-        # Predict drowsiness
+        # Predict using CNN model
         prediction = model.predict(gray_frame)[0][0]
 
-        # Overlay prediction
-        label = "DROWSY" if prediction > 0.7 else "AWAKE"
-        color = (0, 0, 255) if prediction > 0.7 else (0, 255, 0)
-        cv2.putText(img, label, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+        # Display Prediction value
+        st.write(f"Prediction: {prediction:.4f}")
 
-        # Play alarm if drowsy
+        # If prediction > 0.7 (drowsy), play alarm
         if prediction > 0.7:
-            st.audio(alarm_sound, format="audio/mp3", start_time=0)
+            cv2.putText(frame, "DROWSINESS DETECTED!", (50, 50),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            if not pygame.mixer.music.get_busy():
+                pygame.mixer.music.play()
+        else:
+            pygame.mixer.music.stop()
+            cv2.putText(frame, "Awake", (50, 50),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-        return av.VideoFrame.from_ndarray(img, format="bgr24")
+        # Convert frame to RGB for Streamlit display
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        stframe.image(frame, channels="RGB", use_column_width=True)
+        
+        # Wait briefly to prevent UI lag
+        time.sleep(0.05)
+
+    cap.release()
+    cv2.destroyAllWindows()
 
 # Streamlit UI
-st.title("🚗 Driver Drowsiness Detection")
-st.write("Click 'Start' to begin real-time detection.")
+st.title("Driver Drowsiness Detection")
+st.write("Click the button below to start real-time detection.")
 
-webrtc_streamer(key="drowsiness", video_processor_factory=VideoProcessor)
+if st.button("Start Detection"):
+    detect_drowsiness()
