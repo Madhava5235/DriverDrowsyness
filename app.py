@@ -25,16 +25,39 @@ def load_drowsiness_model():
 
 model = load_drowsiness_model()
 
-# Function to play alarm sound
+# Function to play alarm sound with speaker selection
 def play_alarm():
-    """Plays alarm sound using JavaScript in Streamlit."""
-    sound_code = f"""
+    """Plays alarm sound using JavaScript with speaker selection."""
+    sound_code = f
     <script>
-    var audio = new Audio("{ALARM_PATH}");
-    audio.play();
+    async function playSound() {{
+        try {{
+            let audio = new Audio("{ALARM_PATH}");
+            let devices = await navigator.mediaDevices.enumerateDevices();
+            let speakers = devices.filter(device => device.kind === 'audiooutput');
+
+            if (speakers.length > 0) {{
+                let selectedSpeaker = speakers[0].deviceId;
+                let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                let source = audioContext.createMediaElementSource(audio);
+                let destination = audioContext.destination;
+
+                source.connect(destination);
+                audio.setSinkId(selectedSpeaker);
+            }}
+
+            audio.play();
+        }} catch (error) {{
+            console.log("Error playing sound:", error);
+        }}
+    }}
+    playSound();
     </script>
-    """
     components.html(sound_code)
+
+# Button to test the buzzer manually
+if st.button("🔊 Test Buzzer"):
+    play_alarm()
 
 # Video Processing Class for WebRTC
 class VideoProcessor(VideoProcessorBase):
