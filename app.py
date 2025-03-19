@@ -4,19 +4,8 @@ import numpy as np
 import av
 import cv2
 import time
-import io
-import shutil
-from pydub.generators import Sine
-from pydub import AudioSegment
 from tensorflow.keras.models import load_model
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
-
-# Ensure pydub uses the correct FFmpeg path
-FFMPEG_PATH = shutil.which("ffmpeg")
-if FFMPEG_PATH is None:
-    st.error("⚠️ FFmpeg is not installed! Ensure 'ffmpeg' is in the environment path.")
-else:
-    AudioSegment.converter = FFMPEG_PATH
 
 # Get the absolute path of the working directory
 BASE_DIR = os.getcwd()
@@ -34,37 +23,11 @@ def load_drowsiness_model():
 
 model = load_drowsiness_model()
 
-# Function to generate a buzzer sound dynamically
-def generate_buzzer():
-    """Generates a 1000Hz buzzer sound for 1 second."""
-    sample_rate = 44100  # Hz
-    duration = 1000  # milliseconds
-    frequency = 1000  # Hz
-
-    buzzer = Sine(frequency).to_audio_segment(duration=duration).set_frame_rate(sample_rate)
-
-    # Convert to byte stream
-    buzzer_io = io.BytesIO()
-    buzzer.export(buzzer_io, format="mp3")  # Requires FFmpeg
-    buzzer_io.seek(0)
-    return buzzer_io
-
-# Function to play the generated buzzer sound
-def play_buzzer():
-    """Plays the generated buzzer sound using Streamlit's audio player."""
-    buzzer_sound = generate_buzzer()
-    st.audio(buzzer_sound, format="audio/mp3")
-
-# Button to test the buzzer manually
-if st.button("🔊 Test Buzzer"):
-    play_buzzer()
-
 # Video Processing Class for WebRTC
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
         self.frame_skip = 3  # Process every 3rd frame for better performance
         self.counter = 0
-        self.last_alarm_time = 0  # Prevent continuous alarm spam
 
     def recv(self, frame):
         self.counter += 1
@@ -88,11 +51,6 @@ class VideoProcessor(VideoProcessorBase):
         label = "DROWSY" if prediction > 0.7 else "AWAKE"
         color = (0, 0, 255) if prediction > 0.7 else (0, 255, 0)
         cv2.putText(img, label, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-
-        # Play alarm if drowsy (with cooldown)
-        if prediction > 0.7 and (time.time() - self.last_alarm_time > 3):  # 3-second cooldown
-            self.last_alarm_time = time.time()
-            play_buzzer()  # Play generated buzzer sound
 
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
