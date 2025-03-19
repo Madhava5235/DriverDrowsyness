@@ -5,8 +5,7 @@ import av
 import cv2
 import time
 import io
-from pydub import AudioSegment
-from pydub.playback import play
+from pydub.generators import Sine  # Corrected import
 from tensorflow.keras.models import load_model
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 
@@ -33,7 +32,7 @@ def generate_buzzer():
     duration = 1000  # milliseconds
     frequency = 1000  # Hz
 
-    buzzer = AudioSegment.sine(frequency, duration=duration, frame_rate=sample_rate).set_frame_rate(sample_rate)
+    buzzer = Sine(frequency).to_audio_segment(duration=duration).set_frame_rate(sample_rate)
 
     # Convert to byte stream
     buzzer_io = io.BytesIO()
