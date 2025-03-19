@@ -5,7 +5,7 @@ import av
 import cv2
 import time
 import io
-import shutil  # Used to find ffmpeg in the container
+import shutil
 from pydub.generators import Sine
 from pydub import AudioSegment
 from tensorflow.keras.models import load_model
