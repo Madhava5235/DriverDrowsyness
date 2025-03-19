@@ -7,6 +7,10 @@ import time
 from tensorflow.keras.models import load_model
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 
+# Ensure FFmpeg is used for decoding to avoid WebRTC issues
+av.logging.set_level(av.logging.ERROR)
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;udp"
+
 # Get the absolute path of the working directory
 BASE_DIR = os.getcwd()
 
@@ -73,4 +77,8 @@ class VideoProcessor(VideoProcessorBase):
 st.title("🚗 Driver Drowsiness Detection")
 st.write("Click 'Start' to begin real-time detection.")
 
-webrtc_streamer(key="drowsiness", video_processor_factory=VideoProcessor)
+webrtc_streamer(
+    key="drowsiness",
+    video_processor_factory=VideoProcessor,
+    media_stream_constraints={"video": True, "audio": False},  # Prevents session conflicts
+)
