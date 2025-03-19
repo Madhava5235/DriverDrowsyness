@@ -5,14 +5,18 @@ import av
 import cv2
 import time
 import io
-import ffmpeg  # Use ffmpeg-python instead of system ffmpeg
+import shutil  # Used to find ffmpeg in the container
 from pydub.generators import Sine
 from pydub import AudioSegment
 from tensorflow.keras.models import load_model
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 
-# Ensure pydub uses ffmpeg-python instead of system ffmpeg
-AudioSegment.converter = "ffmpeg"
+# Ensure pydub uses the correct FFmpeg path
+FFMPEG_PATH = shutil.which("ffmpeg")
+if FFMPEG_PATH is None:
+    st.error("⚠️ FFmpeg is not installed! Ensure 'ffmpeg' is in the environment path.")
+else:
+    AudioSegment.converter = FFMPEG_PATH
 
 # Get the absolute path of the working directory
 BASE_DIR = os.getcwd()
@@ -41,7 +45,7 @@ def generate_buzzer():
 
     # Convert to byte stream
     buzzer_io = io.BytesIO()
-    buzzer.export(buzzer_io, format="mp3")  # Requires ffmpeg-python
+    buzzer.export(buzzer_io, format="mp3")  # Requires FFmpeg
     buzzer_io.seek(0)
     return buzzer_io
 
