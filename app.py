@@ -4,16 +4,17 @@ import numpy as np
 import av
 import cv2
 import time
-import streamlit.components.v1 as components
+import io
+from pydub import AudioSegment
+from pydub.playback import play
 from tensorflow.keras.models import load_model
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 
 # Get the absolute path of the working directory
 BASE_DIR = os.getcwd()
 
-# Define file paths
+# Define model path
 MODEL_PATH = os.path.join(BASE_DIR, "drowsiness_cnn_model.h5")
-ALARM_PATH = os.path.join(BASE_DIR, "alarm.mp3")
 
 # Load model safely
 @st.cache_resource
@@ -25,39 +26,30 @@ def load_drowsiness_model():
 
 model = load_drowsiness_model()
 
-# Function to play alarm sound with speaker selection
-def play_alarm():
-    """Plays alarm sound using JavaScript with speaker selection."""
-    sound_code = f'''
-    <script>
-    async function playSound() {{
-        try {{
-            let audio = new Audio("{ALARM_PATH}");
-            let devices = await navigator.mediaDevices.enumerateDevices();
-            let speakers = devices.filter(device => device.kind === 'audiooutput');
+# Function to generate a buzzer sound dynamically
+def generate_buzzer():
+    """Generates a 1000Hz buzzer sound for 1 second."""
+    sample_rate = 44100  # Hz
+    duration = 1000  # milliseconds
+    frequency = 1000  # Hz
 
-            if (speakers.length > 0) {{
-                let selectedSpeaker = speakers[0].deviceId;
-                let audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                let source = audioContext.createMediaElementSource(audio);
-                let destination = audioContext.destination;
+    buzzer = AudioSegment.sine(frequency, duration=duration, frame_rate=sample_rate).set_frame_rate(sample_rate)
 
-                source.connect(destination);
-                audio.setSinkId(selectedSpeaker);
-            }}
+    # Convert to byte stream
+    buzzer_io = io.BytesIO()
+    buzzer.export(buzzer_io, format="mp3")
+    buzzer_io.seek(0)
+    return buzzer_io
 
-            audio.play();
-        }} catch (error) {{
-            console.log("Error playing sound:", error);
-        }}
-    }}
-    playSound();
-    </script>'''
-    components.html(sound_code)
+# Function to play the generated buzzer sound
+def play_buzzer():
+    """Plays the generated buzzer sound using Streamlit's audio player."""
+    buzzer_sound = generate_buzzer()
+    st.audio(buzzer_sound, format="audio/mp3")
 
 # Button to test the buzzer manually
 if st.button("🔊 Test Buzzer"):
-    play_alarm()
+    play_buzzer()
 
 # Video Processing Class for WebRTC
 class VideoProcessor(VideoProcessorBase):
@@ -92,7 +84,7 @@ class VideoProcessor(VideoProcessorBase):
         # Play alarm if drowsy (with cooldown)
         if prediction > 0.7 and (time.time() - self.last_alarm_time > 3):  # 3-second cooldown
             self.last_alarm_time = time.time()
-            play_alarm()  # Play sound through JavaScript
+            play_buzzer()  # Play generated buzzer sound
 
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
