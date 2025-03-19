@@ -46,12 +46,12 @@ else:
 # Function to play alarm sound using JavaScript
 def play_alarm():
     """Plays alarm sound using JavaScript in Streamlit."""
-    sound_code = f"""
+    sound_code = f'''
     <script>
     var audio = new Audio("{ALARM_PATH}");
     audio.play();
     </script>
-    """
+    '''
     components.html(sound_code)
 
 # Video Processing Class for WebRTC
