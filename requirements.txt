@@ -4,5 +4,6 @@ opencv-python-headless
 numpy
 tensorflow
 av
+pydub
 imageio[ffmpeg]
 aiortc
