@@ -7,11 +7,16 @@ import time
 from tensorflow.keras.models import load_model
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 
+# Ensure FFmpeg is used for decoding to avoid WebRTC issues
+av.logging.set_level(av.logging.ERROR)
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;udp"
+
 # Get the absolute path of the working directory
 BASE_DIR = os.getcwd()
 
-# Define model path
+# Define file paths
 MODEL_PATH = os.path.join(BASE_DIR, "drowsiness_cnn_model.h5")
+ALARM_PATH = os.path.join(BASE_DIR, "alarm.mp3")
 
 # Load model safely
 @st.cache_resource
@@ -23,11 +28,19 @@ def load_drowsiness_model():
 
 model = load_drowsiness_model()
 
+# Load alarm sound safely
+if os.path.exists(ALARM_PATH):
+    with open(ALARM_PATH, "rb") as f:
+        alarm_sound = f.read()
+else:
+    st.warning("⚠️ Warning: 'alarm.mp3' not found! Alarm sound will not play.")
+
 # Video Processing Class for WebRTC
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
         self.frame_skip = 3  # Process every 3rd frame for better performance
         self.counter = 0
+        self.last_alarm_time = 0  # Prevent continuous alarm spam
 
     def recv(self, frame):
         self.counter += 1
@@ -52,6 +65,12 @@ class VideoProcessor(VideoProcessorBase):
         color = (0, 0, 255) if prediction > 0.7 else (0, 255, 0)
         cv2.putText(img, label, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
+        # Play alarm if drowsy (with cooldown)
+        if prediction > 0.7 and (time.time() - self.last_alarm_time > 3):  # 3-second cooldown
+            self.last_alarm_time = time.time()
+            if os.path.exists(ALARM_PATH):
+                st.audio(alarm_sound, format="audio/mp3", start_time=0)
+
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 # Streamlit UI
@@ -62,6 +81,4 @@ webrtc_streamer(
     key="drowsiness",
     video_processor_factory=VideoProcessor,
     media_stream_constraints={"video": True, "audio": False},  # Prevents session conflicts
-    frontend_rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},  # Updated STUN server configuration
-    video_html_attrs={"autoPlay": True, "controls": False, "muted": True}  # Mute default to prevent errors
 )
