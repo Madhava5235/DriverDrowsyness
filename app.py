@@ -5,9 +5,16 @@ import av
 import cv2
 import time
 import io
-from pydub.generators import Sine  # Corrected import
+import shutil
+from pydub.generators import Sine
+from pydub import AudioSegment
 from tensorflow.keras.models import load_model
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
+
+# Ensure FFmpeg is installed
+if shutil.which("ffmpeg") is None:
+    st.error("⚠️ FFmpeg is missing! Ensure 'ffmpeg' is installed in your Streamlit deployment.")
+AudioSegment.converter = "ffmpeg"
 
 # Get the absolute path of the working directory
 BASE_DIR = os.getcwd()
@@ -36,7 +43,7 @@ def generate_buzzer():
 
     # Convert to byte stream
     buzzer_io = io.BytesIO()
-    buzzer.export(buzzer_io, format="mp3")
+    buzzer.export(buzzer_io, format="mp3")  # Requires FFmpeg
     buzzer_io.seek(0)
     return buzzer_io
 
