@@ -1,17 +1,20 @@
 import os
-import streamlit as st
-import numpy as np
 import av
 import cv2
 import time
+import streamlit as st
 import streamlit.components.v1 as components
 from tensorflow.keras.models import load_model
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 
+# Ensure FFmpeg is used for decoding to avoid WebRTC issues
+av.logging.set_level(av.logging.ERROR)
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;udp"
+
 # Get the absolute path of the working directory
 BASE_DIR = os.getcwd()
 
-# Define file paths
+# Define model and alarm paths
 MODEL_PATH = os.path.join(BASE_DIR, "drowsiness_cnn_model.h5")
 ALARM_PATH = os.path.join(BASE_DIR, "alarm.mp3")
 
@@ -25,40 +28,23 @@ def load_drowsiness_model():
 
 model = load_drowsiness_model()
 
-# Function to play alarm sound with speaker selection
+# Load alarm sound safely
+if os.path.exists(ALARM_PATH):
+    with open(ALARM_PATH, "rb") as f:
+        alarm_sound = f.read()
+else:
+    st.warning("⚠️ Warning: 'alarm.mp3' not found! Alarm sound will not play.")
+
+# Function to play alarm sound using JavaScript
 def play_alarm():
-    """Plays alarm sound using JavaScript with speaker selection."""
+    """Plays alarm sound using JavaScript in Streamlit."""
     sound_code = f"""
     <script>
-    async function playSound() {{
-        try {{
-            let audio = new Audio("{ALARM_PATH}");
-            let devices = await navigator.mediaDevices.enumerateDevices();
-            let speakers = devices.filter(device => device.kind === 'audiooutput');
-
-            if (speakers.length > 0) {{
-                let selectedSpeaker = speakers[0].deviceId;
-                let audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                let source = audioContext.createMediaElementSource(audio);
-                let destination = audioContext.destination;
-
-                source.connect(destination);
-                audio.setSinkId(selectedSpeaker);
-            }}
-
-            audio.play();
-        }} catch (error) {{
-            console.log("Error playing sound:", error);
-        }}
-    }}
-    playSound();
+    var audio = new Audio("{ALARM_PATH}");
+    audio.play();
     </script>
     """
     components.html(sound_code)
-
-# Button to test the buzzer manually
-if st.button("🔊 Test Buzzer"):
-    play_alarm()
 
 # Video Processing Class for WebRTC
 class VideoProcessor(VideoProcessorBase):
@@ -105,6 +91,6 @@ webrtc_streamer(
     key="drowsiness",
     video_processor_factory=VideoProcessor,
     media_stream_constraints={"video": True, "audio": False},  # Prevents session conflicts
-    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},  # Google STUN for multi-device support
-    video_html_attrs={"autoPlay": True, "controls": False, "muted": True}  # Mute default to prevent errors
+    frontend_rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},  # Updated RTC config
+    video_html_attrs={"autoPlay": True, "controls": False, "muted": True}  # Prevents audio issues in browsers
 )
