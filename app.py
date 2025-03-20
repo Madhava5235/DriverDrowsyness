@@ -2,6 +2,7 @@ import streamlit as st
 import numpy as np
 import av
 import cv2
+import pygame  # For buzzer sound
 from tensorflow.keras.models import load_model
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, WebRtcMode, RTCConfiguration
 
@@ -19,16 +20,20 @@ eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_eye.xml
 # WebRTC Configuration for Low Latency
 RTC_CONFIG = RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]})
 
+# Initialize Pygame for buzzer sound
+pygame.mixer.init()
+buzzer_sound = "buzzer.mp3"  # Ensure you have a buzzer sound file
+
 # Video Processing Class
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
-        self.frame_skip = 2  # Process every 2nd frame for smooth real-time streaming
+        self.frame_skip = 2  # Process every 2nd frame for better performance
         self.counter = 0
 
     def recv(self, frame):
         self.counter += 1
         if self.counter % self.frame_skip != 0:
-            return frame  # Skip processing some frames for better performance
+            return frame  # Skip processing some frames for performance
 
         img = frame.to_ndarray(format="bgr24")  # Maintain original resolution
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -56,16 +61,21 @@ class VideoProcessor(VideoProcessorBase):
         color = (0, 0, 255) if prediction > 0.7 else (0, 255, 0)
         cv2.putText(img, label, (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
+        # Play buzzer sound if drowsiness detected
+        if prediction > 0.7:
+            pygame.mixer.music.load(buzzer_sound)
+            pygame.mixer.music.play()
+
         return av.VideoFrame.from_ndarray(img, format="bgr24")  # Preserve original resolution
 
 # Streamlit UI
 st.title("🚗 Driver Drowsiness Detection")
-st.write("Click 'Start' to begin real-time detection.")
+st.write("Click 'Start' to begin real-time detection. If drowsiness is detected, a buzzer will sound.")
 
 webrtc_streamer(
     key="drowsiness_detection",
     mode=WebRtcMode.SENDRECV,
     video_processor_factory=VideoProcessor,
     rtc_configuration=RTC_CONFIG,
-    media_stream_constraints={"video": True, "audio": False}  # No forced resolution change
+    media_stream_constraints={"video": True, "audio": False}  # Audio disabled
 )
