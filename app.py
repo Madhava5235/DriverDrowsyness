@@ -1,12 +1,12 @@
 import os
 import tensorflow as tf
 
-# Fix OpenCV `libGL.so.1` error by setting headless mode
-os.environ["OPENCV_VIDEOIO_PRIORITY_MSMF"] = "0"
+# 🔹 Force TensorFlow to use CPU only (Prevents CUDA, cuDNN, and cuBLAS errors)
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
-# Suppress TensorFlow warnings related to feedback tensors
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0 = All messages, 1 = INFO, 2 = WARNINGS, 3 = ERRORS
-tf.get_logger().setLevel('ERROR')
+# 🔹 Suppress TensorFlow warnings and logs
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # 0 = All, 1 = INFO, 2 = WARNINGS, 3 = ERRORS
+tf.get_logger().setLevel("ERROR")
 
 import streamlit as st
 import numpy as np
@@ -23,7 +23,7 @@ face_mesh = mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_con
 # Load model only once (cached)
 @st.cache_resource
 def load_drowsiness_model():
-    return load_model("drowsiness_cnn_model.h5")
+    return load_model("drowsiness_cnn_model.h5", compile=False)  # Prevents optimizer warnings
 
 model = load_drowsiness_model()
 
