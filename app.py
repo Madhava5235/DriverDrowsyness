@@ -3,6 +3,7 @@ import numpy as np
 import av
 import cv2
 import time
+import os
 from tensorflow.keras.models import load_model
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 
@@ -12,10 +13,6 @@ def load_drowsiness_model():
     return load_model("drowsiness_cnn_model.h5")
 
 model = load_drowsiness_model()
-
-# Load alarm sound
-with open("alarm.mp3", "rb") as f:
-    alarm_sound = f.read()
 
 # Video Processing Class for WebRTC
 class VideoProcessor(VideoProcessorBase):
@@ -44,10 +41,10 @@ class VideoProcessor(VideoProcessorBase):
         color = (0, 0, 255) if prediction > 0.7 else (0, 255, 0)
         cv2.putText(img, label, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
-        # Play alarm if drowsy (with cooldown)
+        # Play buzzer if drowsy (with cooldown)
         if prediction > 0.7 and (time.time() - self.last_alarm_time > 3):  # 3-second cooldown
             self.last_alarm_time = time.time()
-            st.audio(alarm_sound, format="audio/mp3", start_time=0)
+            os.system('echo -e "\a"')  # Triggers a system beep (on supported OS)
 
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
