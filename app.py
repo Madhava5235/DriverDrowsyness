@@ -8,7 +8,7 @@ from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
 # Load model only once (cached)
 @st.cache_resource
 def load_drowsiness_model():
-    return load_model("drowsiness_cnn_model.h5") add additional features like face detection a dneyetraking and give me requirements.txt file content because i am using git hub repo to host in streamlit comm cloud optimmize the code accordingly dont changge the core of the code 
+    return load_model("drowsiness_cnn_model.h5") 
 
 model = load_drowsiness_model()
 
