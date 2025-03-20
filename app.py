@@ -1,52 +1,26 @@
-import os
-import tensorflow as tf
-
-# 🔹 Force TensorFlow to use CPU only (Prevents CUDA, cuDNN, and cuBLAS errors)
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-
-# 🔹 Suppress TensorFlow warnings and logs
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"  # 0 = All, 1 = INFO, 2 = WARNINGS, 3 = ERRORS
-tf.get_logger().setLevel("ERROR")
-
 import streamlit as st
 import numpy as np
 import av
 import cv2
-import mediapipe as mp  # Using MediaPipe for face & eye detection
 from tensorflow.keras.models import load_model
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
-
-# Load MediaPipe FaceMesh
-mp_face_mesh = mp.solutions.face_mesh
-face_mesh = mp_face_mesh.FaceMesh(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
 # Load model only once (cached)
 @st.cache_resource
 def load_drowsiness_model():
-    return load_model("drowsiness_cnn_model.h5", compile=False)  # Prevents optimizer warnings
+    return load_model("drowsiness_cnn_model.h5")
 
 model = load_drowsiness_model()
 
-# Function to extract eye landmarks from MediaPipe FaceMesh
-def get_eye_landmarks(image):
-    """Detects eyes using MediaPipe FaceMesh instead of dlib"""
-    img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    results = face_mesh.process(img_rgb)
-
-    if results.multi_face_landmarks:
-        for face_landmarks in results.multi_face_landmarks:
-            left_eye = [face_landmarks.landmark[i] for i in range(133, 144)]
-            right_eye = [face_landmarks.landmark[i] for i in range(362, 373)]
-            return left_eye, right_eye
-    return None, None
+# Load Haarcascade classifiers for face and eye detection
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_eye.xml")
 
 # Video Processing Class for WebRTC
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
-        self.frame_skip = 2  # Process every 2nd frame for better performance
+        self.frame_skip = 3  # Process every 3rd frame for better performance
         self.counter = 0
-        self.drowsy_frame_count = 0
-        self.alert_threshold = 5  # Number of consecutive drowsy frames before alert
 
     def recv(self, frame):
         self.counter += 1
@@ -54,56 +28,40 @@ class VideoProcessor(VideoProcessorBase):
             return frame  # Skip processing some frames
 
         img = frame.to_ndarray(format="bgr24")
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        # Detect eye landmarks
-        left_eye, right_eye = get_eye_landmarks(img)
-        if left_eye is None or right_eye is None:
-            return av.VideoFrame.from_ndarray(img, format="bgr24")  # No face detected
+        # Detect faces
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
-        # Convert to grayscale and preprocess for CNN model
-        gray_frame = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        resized_frame = cv2.resize(gray_frame, (64, 64))
-        normalized_frame = resized_frame.reshape(1, 64, 64, 1) / 255.0  # Normalize
+        for (x, y, w, h) in faces:
+            cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
-        # Predict drowsiness using CNN model
-        cnn_prediction = model.predict(normalized_frame)[0][0]
+            # Region of interest for eyes
+            roi_gray = gray[y:y + h, x:x + w]
+            roi_color = img[y:y + h, x:x + w]
 
-        # Adaptive thresholding based on CNN prediction
-        if cnn_prediction > 0.7:
-            self.drowsy_frame_count += 1
-        else:
-            self.drowsy_frame_count = 0
+            # Detect eyes within the detected face region
+            eyes = eye_cascade.detectMultiScale(roi_gray, scaleFactor=1.1, minNeighbors=3, minSize=(20, 20))
+            for (ex, ey, ew, eh) in eyes:
+                cv2.rectangle(roi_color, (ex, ey), (ex + ew, ey + eh), (0, 255, 0), 2)
+
+        # Preprocess image for drowsiness prediction
+        gray_frame = cv2.resize(gray, (64, 64)).reshape(1, 64, 64, 1) / 255.0  # Normalize
+        prediction = model.predict(gray_frame)[0][0]
 
         # Overlay prediction
-        label = "DROWSY" if self.drowsy_frame_count >= self.alert_threshold else "AWAKE"
-        color = (0, 0, 255) if label == "DROWSY" else (0, 255, 0)
+        label = "DROWSY" if prediction > 0.7 else "AWAKE"
+        color = (0, 0, 255) if prediction > 0.7 else (0, 255, 0)
         cv2.putText(img, label, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
-        # Draw eye landmarks
-        for point in left_eye:
-            x, y = int(point.x * img.shape[1]), int(point.y * img.shape[0])
-            cv2.circle(img, (x, y), 2, (0, 255, 0), -1)
-        for point in right_eye:
-            x, y = int(point.x * img.shape[1]), int(point.y * img.shape[0])
-            cv2.circle(img, (x, y), 2, (0, 255, 0), -1)
-
-        # Streamlit alert if drowsy for consecutive frames
-        if self.drowsy_frame_count >= self.alert_threshold:
+        # Streamlit alert for drowsiness
+        if prediction > 0.7:
             st.warning("⚠️ Drowsiness Detected! Stay Alert!")
 
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 # Streamlit UI
-st.title("🚗 Enhanced Driver Drowsiness Detection with MediaPipe")
+st.title("🚗 Driver Drowsiness Detection with Face & Eye Tracking")
 st.write("Click 'Start' to begin real-time detection.")
 
-webrtc_streamer(
-    key="drowsiness",
-    video_processor_factory=VideoProcessor,
-    media_stream_constraints={"video": True, "audio": False},  # Prevents session conflicts
-    frontend_rtc_configuration={
-        "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}],
-        "iceTransportPolicy": "relay"  # Forces TCP transport to avoid `sendto` errors
-    },
-    video_html_attrs={"autoPlay": True, "controls": False, "muted": True}  # Prevents browser autoplay issues
-)
+webrtc_streamer(key="drowsiness", video_processor_factory=VideoProcessor)
