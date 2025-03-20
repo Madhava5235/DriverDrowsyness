@@ -2,8 +2,9 @@ import streamlit as st
 import numpy as np
 import av
 import cv2
+import asyncio
 from tensorflow.keras.models import load_model
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, WebRtcMode
 
 # Load model only once (cached)
 @st.cache_resource
@@ -22,7 +23,7 @@ class VideoProcessor(VideoProcessorBase):
         self.frame_skip = 3  # Process every 3rd frame for better performance
         self.counter = 0
 
-    def recv(self, frame):
+    async def recv(self, frame):
         self.counter += 1
         if self.counter % self.frame_skip != 0:
             return frame  # Skip processing some frames
@@ -61,7 +62,12 @@ class VideoProcessor(VideoProcessorBase):
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 # Streamlit UI
-st.title("🚗 Driver Drowsiness Detection with Face & Eye Tracking")
-st.write("Click 'Start' to begin real-time detection.")
+st.title("🚗 Multi-User Driver Drowsiness Detection")
+st.write("Click 'Start' to begin real-time detection on your device.")
 
-webrtc_streamer(key="drowsiness", video_processor_factory=VideoProcessor)
+webrtc_streamer(
+    key="multi_drowsiness",
+    mode=WebRtcMode.SENDRECV,  # Allows multiple devices to stream video
+    video_processor_factory=VideoProcessor,
+    async_processing=True  # Enables async for multi-user support
+)
