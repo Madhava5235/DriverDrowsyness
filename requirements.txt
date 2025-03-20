@@ -8,6 +8,4 @@ pydub
 ffmpeg-python
 imageio[ffmpeg]
 aiortc
-mediapipe 
-libgl1-mesa-glx
-libglib2.0-0
+mediapipe
