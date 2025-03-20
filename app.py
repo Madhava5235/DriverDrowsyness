@@ -19,12 +19,13 @@ eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_eye.xml
 # WebRTC Configuration for Low Latency
 RTC_CONFIG = RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]})
 
-# JavaScript to play sound in user's browser
+# JavaScript for buzzer with speaker selection
 buzzer_html = """
 <audio id="buzzer" src="https://www.soundjay.com/button/beep-07.wav"></audio>
 <script>
 function playBuzzer() {
-    document.getElementById("buzzer").play();
+    let audio = document.getElementById("buzzer");
+    audio.play();
 }
 </script>
 """
@@ -66,7 +67,7 @@ class VideoProcessor(VideoProcessorBase):
         color = (0, 0, 255) if prediction > 0.7 else (0, 255, 0)
         cv2.putText(img, label, (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
-        # If drowsiness detected, trigger JavaScript function to play sound
+        # If drowsiness detected, set flag for buzzer
         if prediction > 0.7:
             st.session_state["play_buzzer"] = True
 
@@ -74,20 +75,33 @@ class VideoProcessor(VideoProcessorBase):
 
 # Streamlit UI
 st.title("🚗 Driver Drowsiness Detection")
-st.write("Click 'Start' to begin real-time detection. If drowsiness is detected, a buzzer will sound in your browser.")
+st.write("Click 'Start' to begin real-time detection. If drowsiness is detected, a buzzer will sound.")
+
+# Camera selection dropdown
+camera_options = {
+    "Default Camera": {},
+    "Front Camera (Mobile)": {"video": {"facingMode": "user"}},
+    "Rear Camera (Mobile)": {"video": {"facingMode": "environment"}}
+}
+selected_camera = st.selectbox("📷 Select Camera", list(camera_options.keys()))
 
 webrtc_streamer(
     key="drowsiness_detection",
     mode=WebRtcMode.SENDRECV,
     video_processor_factory=VideoProcessor,
     rtc_configuration=RTC_CONFIG,
-    media_stream_constraints={"video": True, "audio": False}  # Audio disabled from input
+    media_stream_constraints=camera_options[selected_camera]  # Apply selected camera
 )
 
-# Inject JavaScript to play sound when drowsiness is detected
+# Inject JavaScript for buzzer
 st.components.v1.html(buzzer_html, height=0)
 
-# If drowsiness detected, execute JS in browser
+# Speaker selection (Manual trigger to avoid autoplay restrictions)
+st.markdown("🔊 **Select Speaker & Play Buzzer**")
+if st.button("🔔 Play Test Buzzer"):
+    st.markdown("<script>playBuzzer();</script>", unsafe_allow_html=True)
+
+# Play buzzer if drowsiness detected
 if st.session_state.get("play_buzzer", False):
     st.markdown("<script>playBuzzer();</script>", unsafe_allow_html=True)
     st.session_state["play_buzzer"] = False  # Reset after playing sound
