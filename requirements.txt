@@ -4,8 +4,3 @@ opencv-python-headless
 numpy
 tensorflow
 av
-pydub
-ffmpeg-python
-imageio[ffmpeg]
-aiortc
-asyncio
