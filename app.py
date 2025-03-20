@@ -22,29 +22,25 @@ RTC_CONFIG = RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:
 # Video Processing Class
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
-        self.frame_skip = 3  # Process every 3rd frame (optimizing latency)
+        self.frame_skip = 2  # Process every 2nd frame for smooth real-time streaming
         self.counter = 0
 
     def recv(self, frame):
         self.counter += 1
         if self.counter % self.frame_skip != 0:
-            return frame  # Skip processing some frames for performance
+            return frame  # Skip processing some frames for better performance
 
-        img = frame.to_ndarray(format="bgr24")
+        img = frame.to_ndarray(format="bgr24")  # Maintain original resolution
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        # Reduce resolution for performance
-        img_resized = cv2.resize(img, (640, 480))  
-        gray_resized = cv2.resize(gray, (640, 480))
-
         # Detect faces
-        faces = face_cascade.detectMultiScale(gray_resized, scaleFactor=1.1, minNeighbors=4, minSize=(40, 40))
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4, minSize=(50, 50))
         for (x, y, w, h) in faces:
-            cv2.rectangle(img_resized, (x, y), (x + w, y + h), (255, 0, 0), 2)
+            cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
             # Region of interest for eyes
-            roi_gray = gray_resized[y:y + h, x:x + w]
-            roi_color = img_resized[y:y + h, x:x + w]
+            roi_gray = gray[y:y + h, x:x + w]
+            roi_color = img[y:y + h, x:x + w]
 
             # Detect eyes
             eyes = eye_cascade.detectMultiScale(roi_gray, scaleFactor=1.1, minNeighbors=3, minSize=(20, 20))
@@ -52,15 +48,15 @@ class VideoProcessor(VideoProcessorBase):
                 cv2.rectangle(roi_color, (ex, ey), (ex + ew, ey + eh), (0, 255, 0), 2)
 
         # Preprocess for model input
-        gray_frame = cv2.resize(gray_resized, (64, 64)).reshape(1, 64, 64, 1) / 255.0  
-        prediction = model.predict(gray_frame, verbose=0)[0][0]  
+        resized_gray = cv2.resize(gray, (64, 64)).reshape(1, 64, 64, 1) / 255.0  
+        prediction = model.predict(resized_gray, verbose=0)[0][0]  
 
         # Overlay prediction
         label = "DROWSY" if prediction > 0.7 else "AWAKE"
         color = (0, 0, 255) if prediction > 0.7 else (0, 255, 0)
-        cv2.putText(img_resized, label, (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+        cv2.putText(img, label, (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
-        return av.VideoFrame.from_ndarray(img_resized, format="bgr24")
+        return av.VideoFrame.from_ndarray(img, format="bgr24")  # Preserve original resolution
 
 # Streamlit UI
 st.title("🚗 Driver Drowsiness Detection")
@@ -71,5 +67,5 @@ webrtc_streamer(
     mode=WebRtcMode.SENDRECV,
     video_processor_factory=VideoProcessor,
     rtc_configuration=RTC_CONFIG,
-    media_stream_constraints={"video": {"width": 640, "height": 480, "frameRate": 20}, "audio": False}  
+    media_stream_constraints={"video": True, "audio": False}  # No forced resolution change
 )
