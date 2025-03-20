@@ -5,7 +5,7 @@ import cv2
 from tensorflow.keras.models import load_model
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, WebRtcMode, RTCConfiguration
 
-# Load model only once (cached)
+# Load model once and cache it
 @st.cache_resource
 def load_drowsiness_model():
     return load_model("drowsiness_cnn_model.h5")
@@ -16,19 +16,22 @@ model = load_drowsiness_model()
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_eye.xml")
 
-# WebRTC Configuration for Low Latency
-RTC_CONFIG = RTCConfiguration({"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]})
+# WebRTC Config - Ensures smooth video without lag
+RTC_CONFIG = RTCConfiguration({
+    "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}], 
+    "iceTransportPolicy": "relay"
+})
 
-# Video Processing Class
+# Video Processor Class
 class VideoProcessor(VideoProcessorBase):
     def __init__(self):
-        self.frame_skip = 2  # Process every 2nd frame for smooth real-time streaming
+        self.frame_skip = 1  # Process every frame for smooth video
         self.counter = 0
 
     def recv(self, frame):
         self.counter += 1
         if self.counter % self.frame_skip != 0:
-            return frame  # Skip processing some frames for better performance
+            return frame  # Skip some frames for better performance
 
         img = frame.to_ndarray(format="bgr24")  # Maintain original resolution
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -38,25 +41,23 @@ class VideoProcessor(VideoProcessorBase):
         for (x, y, w, h) in faces:
             cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
 
-            # Region of interest for eyes
+            # Detect eyes inside face region
             roi_gray = gray[y:y + h, x:x + w]
             roi_color = img[y:y + h, x:x + w]
-
-            # Detect eyes
             eyes = eye_cascade.detectMultiScale(roi_gray, scaleFactor=1.1, minNeighbors=3, minSize=(20, 20))
             for (ex, ey, ew, eh) in eyes:
                 cv2.rectangle(roi_color, (ex, ey), (ex + ew, ey + eh), (0, 255, 0), 2)
 
-        # Preprocess for model input
+        # Resize & Normalize input for CNN model
         resized_gray = cv2.resize(gray, (64, 64)).reshape(1, 64, 64, 1) / 255.0  
         prediction = model.predict(resized_gray, verbose=0)[0][0]  
 
-        # Overlay prediction
+        # Overlay prediction on video
         label = "DROWSY" if prediction > 0.7 else "AWAKE"
         color = (0, 0, 255) if prediction > 0.7 else (0, 255, 0)
         cv2.putText(img, label, (30, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
-        return av.VideoFrame.from_ndarray(img, format="bgr24")  # Preserve original resolution
+        return av.VideoFrame.from_ndarray(img, format="bgr24")  # Keep high resolution
 
 # Streamlit UI
 st.title("🚗 Driver Drowsiness Detection")
@@ -67,5 +68,12 @@ webrtc_streamer(
     mode=WebRtcMode.SENDRECV,
     video_processor_factory=VideoProcessor,
     rtc_configuration=RTC_CONFIG,
-    media_stream_constraints={"video": True, "audio": False}  # No forced resolution change
+    media_stream_constraints={
+        "video": {
+            "width": {"ideal": 1280}, 
+            "height": {"ideal": 720},  
+            "frameRate": {"ideal": 30}
+        }, 
+        "audio": False
+    }
 )
