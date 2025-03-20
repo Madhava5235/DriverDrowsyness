@@ -1,12 +1,6 @@
 streamlit
-streamlit-webrtc
-opencv-python-headless
 numpy
+opencv-python-headless
 tensorflow
+streamlit-webrtc
 av
-pydub
-ffmpeg-python
-imageio[ffmpeg]
-aiortc
-mediapipe  # Using MediaPipe instead of dlib
-asyncio
