@@ -1,3 +1,13 @@
+import os
+import tensorflow as tf
+
+# Fix OpenCV `libGL.so.1` error by setting headless mode
+os.environ["OPENCV_VIDEOIO_PRIORITY_MSMF"] = "0"
+
+# Suppress TensorFlow warnings related to feedback tensors
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0 = All messages, 1 = INFO, 2 = WARNINGS, 3 = ERRORS
+tf.get_logger().setLevel('ERROR')
+
 import streamlit as st
 import numpy as np
 import av
