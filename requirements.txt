@@ -4,3 +4,10 @@ opencv-python-headless
 numpy
 tensorflow
 av
+pydub
+ffmpeg-python
+imageio[ffmpeg]
+aiortc
+dlib
+scipy  # Required for EAR calculations
+pyngrok  # If running on Colab for public access
